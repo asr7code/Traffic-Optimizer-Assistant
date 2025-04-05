@@ -6,9 +6,10 @@ import pickle
 from PIL import Image
 import cv2
 
-# Must be the first command
-st.set_page_config(page_title="GTSRB Voice Alert Classifier", layout="centered")
+# Set Streamlit config FIRST
+st.set_page_config(page_title="Traffic Sign Voice Alert", layout="centered")
 
+# Load model and label binarizer with caching
 @st.cache_resource
 def load_cnn_model():
     return load_model("best_model.h5")
@@ -30,34 +31,34 @@ def preprocess_image(image_data):
     image_bgr = image_bgr.astype("float32") / 255.0
     return np.expand_dims(image_bgr, axis=0)
 
-# JavaScript for speaking using browser voice
-def speak_js(label):
-    escaped = str(label).replace('"', '\\"')
+def auto_speak_js(label):
+    safe_label = str(label).replace('"', '\\"')
     st.components.v1.html(f"""
     <script>
-        function speakLabel() {{
-            var msg = new SpeechSynthesisUtterance("Caution. {escaped}");
-            window.speechSynthesis.speak(msg);
-        }}
+        const msg = new SpeechSynthesisUtterance("Caution! {safe_label}");
+        window.speechSynthesis.cancel();  // Cancel any existing speech
+        window.speechSynthesis.speak(msg);
     </script>
-    <button onclick="speakLabel()">🔊 Speak Prediction</button>
-    """, height=100)
+    """, height=0)
 
-# App UI
+# Streamlit UI
 st.title("🚦 Traffic Sign Classifier with Voice Alert")
 
-uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Upload a traffic sign image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
     st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
+
+    # Predict
     processed_image = preprocess_image(uploaded_file)
     prediction = model.predict(processed_image)
     predicted_index = np.argmax(prediction)
     predicted_label = class_names[predicted_index]
     confidence = prediction[0][predicted_index] * 100
 
-    st.markdown(f"### 🧠 Prediction: **{predicted_label}**")
+    # Display prediction
+    st.markdown(f"### 🧠 Predicted Sign: **{predicted_label}**")
     st.markdown(f"#### 🔍 Confidence: **{confidence:.2f}%**")
 
-    # Speak label
-    speak_js(predicted_label)
+    # Trigger speech alert automatically
+    auto_speak_js(predicted_label)
