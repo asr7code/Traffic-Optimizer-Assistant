@@ -1,50 +1,55 @@
 import streamlit as st
-from PIL import Image
 import numpy as np
+import pandas as pd
 import tensorflow as tf
+from PIL import Image
+import cv2
+import os
+
+# Constants
+IMG_HEIGHT = 64
+IMG_WIDTH = 64
 
 # Load model
-model = tf.keras.models.load_model("best_model.h5")
+@st.cache_resource
+def load_model():
+    return tf.keras.models.load_model("best_model.h5")
 
-# 43 class names (0–42 as integers)
-class_names = list(range(43))  # GTSRB uses numeric class IDs
+model = load_model()
 
-IMG_SIZE = (64, 64)
+# Load class names from signnames.csv
+@st.cache_data
+def load_class_names():
+    df = pd.read_csv("signnames.csv")
+    return df
 
+sign_df = load_class_names()
+
+st.set_page_config(page_title="GTSRB Traffic Sign Classifier")
 st.title("🚦 GTSRB Traffic Sign Classifier")
-st.write("Upload a traffic sign image to predict the class (0–42).")
+st.write("Upload an image of a German traffic sign and the model will predict its class!")
 
-uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
+uploaded_file = st.file_uploader("Choose a traffic sign image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    try:
-        # Load and display image
-        image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="Uploaded Image", use_column_width=True)
+    # Display uploaded image
+    st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
 
-        # Convert to NumPy
-        image_np = np.array(image)
+    # Preprocess the image
+    image = Image.open(uploaded_file).convert("RGB")
+    image = image.resize((IMG_WIDTH, IMG_HEIGHT))
+    img_array = np.array(image).astype("float32") / 255.0
+    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
 
-        # Convert RGB to BGR (to match OpenCV training)
-        image_bgr = image_np[..., ::-1]
+    # Predict
+    predictions = model.predict(img_array)
+    pred_class_id = np.argmax(predictions, axis=1)[0]
 
-        # Resize to 64x64 (same as training)
-        image_resized = tf.image.resize(image_bgr, IMG_SIZE).numpy()
+    # Get the class name
+    class_name = sign_df.loc[sign_df['ClassId'] == pred_class_id, 'SignName'].values[0]
 
-        # Normalize
-        image_normalized = image_resized.astype("float32") / 255.0
+    st.success(f"🧠 Predicted: **{class_name}** (Class ID: {pred_class_id})")
 
-        # Add batch dimension
-        input_array = np.expand_dims(image_normalized, axis=0)
-
-        # Predict
-        prediction = model.predict(input_array)
-        pred_class_id = int(np.argmax(prediction))
-        confidence = float(np.max(prediction) * 100)
-
-        st.success(f"Predicted Class ID: **{pred_class_id}**")
-        st.info(f"Confidence: {confidence:.2f}%")
-
-    except Exception as e:
-        st.error("❌ Prediction failed.")
-        st.text(str(e))
+    # Optionally: Show prediction confidence
+    confidence = np.max(predictions) * 100
+    st.info(f"📊 Confidence: {confidence:.2f}%")
