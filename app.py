@@ -1,56 +1,48 @@
 import streamlit as st
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 from PIL import Image
+import cv2
 
-# ✅ MUST be the first Streamlit command
+# 🔧 Must be first Streamlit command
 st.set_page_config(page_title="Traffic Sign Classifier", layout="centered")
 
-# Function to load model
+# 🚀 Load model only once using caching
 @st.cache_resource
 def load_model():
     model = tf.keras.models.load_model("best_model.h5")
     return model
 
-# Function to load class names from CSV
-@st.cache_data
-def load_class_names():
-    df = pd.read_csv("signnames.csv")
-    return dict(zip(df['ClassId'], df['SignName']))
-
-# Preprocess image for prediction
-def preprocess_image(uploaded_file):
-    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-    img = cv2.imdecode(file_bytes, 1)  # 1 for color
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Important
-    img = cv2.resize(img, (64, 64))
-    img = img / 255.0  # Normalize
-    img = np.expand_dims(img, axis=0)  # Add batch dimension
-    return img
-
-
-# Load model and class names
+# 🧠 Load the model
 model = load_model()
-class_names = load_class_names()
 
-# Streamlit UI
+# 📂 Load class names
+with open("labels.txt", "r") as f:
+    class_names = [line.strip() for line in f.readlines()]
+
+# 🧼 Preprocess function for input image
+def preprocess_image(image):
+    img = Image.open(image).convert('RGB')
+    img = img.resize((64, 64))  # resize to model's expected input size
+    img_array = np.array(img)
+    img_array = img_array / 255.0  # normalize
+    img_array = np.expand_dims(img_array, axis=0)  # shape: (1, 64, 64, 3)
+    return img_array
+
+# 🧠 App Title
 st.title("🚦 Traffic Sign Classifier")
-st.markdown("Upload a traffic sign image and get its prediction.")
+st.write("Upload an image of a traffic sign and I’ll predict what it is.")
 
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+# 📤 File uploader
+uploaded_file = st.file_uploader("Choose a traffic sign image...", type=["jpg", "jpeg", "png"])
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Image", use_column_width=True)
+# 🔮 Predict and display results
+if uploaded_file is not None: 
+    st.image(uploaded_file, caption='Uploaded Image', use_column_width=True)
 
-    st.write("⏳ Predicting...")
-    processed_image = preprocess_image(image)
+    # Preprocess image and make prediction
+    processed_image = preprocess_image(uploaded_file)
     prediction = model.predict(processed_image)
-    class_index = np.argmax(prediction)
-    confidence = float(np.max(prediction))
+    predicted_class = np.argmax(prediction)
 
-    class_name = class_names.get(class_index, "Unknown")
-
-    st.success(f"### 🧠 Prediction: {class_name}")
-    st.info(f"🔢 Class ID: {class_index} | 🔍 Confidence: {confidence:.2f}")
+    st.write(f"### 🧠 Predicted Traffic Sign Class: **{class_names[predicted_class]}**")
