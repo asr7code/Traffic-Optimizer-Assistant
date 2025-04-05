@@ -1,48 +1,40 @@
 import streamlit as st
 import numpy as np
-import tensorflow as tf
 from PIL import Image
-import cv2
+import tensorflow as tf
+import pickle
 
-# 🔧 Must be first Streamlit command
-st.set_page_config(page_title="Traffic Sign Classifier", layout="centered")
+# Load trained model
+model = tf.keras.models.load_model("best_model.h5")
 
-# 🚀 Load model only once using caching
+# Load label binarizer
 @st.cache_resource
-def load_model():
-    model = tf.keras.models.load_model("best_model.h5")
-    return model
+def load_label_binarizer():
+    with open("label_binarizer.pkl", "rb") as f:
+        return pickle.load(f)
 
-# 🧠 Load the model
-model = load_model()
+label_binarizer = load_label_binarizer()
+class_names = label_binarizer.classes_
 
-# 📂 Load class names
-with open("labels.txt", "r") as f:
-    class_names = [line.strip() for line in f.readlines()]
-
-# 🧼 Preprocess function for input image
+# Preprocessing function
 def preprocess_image(image):
-    img = Image.open(image).convert('RGB')
-    img = img.resize((64, 64))  # resize to model's expected input size
-    img_array = np.array(img)
-    img_array = img_array / 255.0  # normalize
-    img_array = np.expand_dims(img_array, axis=0)  # shape: (1, 64, 64, 3)
-    return img_array
+    img = Image.open(image).convert("RGB")
+    img = img.resize((64, 64))  # Ensure same size as training
+    img_array = np.array(img).astype("float32") / 255.0  # Normalize
+    return np.expand_dims(img_array, axis=0)  # Add batch dimension
 
-# 🧠 App Title
-st.title("🚦 Traffic Sign Classifier")
-st.write("Upload an image of a traffic sign and I’ll predict what it is.")
+# Streamlit UI
+st.title("🚦 GTSRB Traffic Sign Classifier")
+st.write("Upload an image of a traffic sign:")
 
-# 📤 File uploader
-uploaded_file = st.file_uploader("Choose a traffic sign image...", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
 
-# 🔮 Predict and display results
-if uploaded_file is not None: 
+if uploaded_file is not None:
     st.image(uploaded_file, caption='Uploaded Image', use_column_width=True)
 
-    # Preprocess image and make prediction
     processed_image = preprocess_image(uploaded_file)
     prediction = model.predict(processed_image)
     predicted_class = np.argmax(prediction)
+    class_label = class_names[predicted_class]
 
-    st.write(f"### 🧠 Predicted Traffic Sign Class: **{class_names[predicted_class]}**")
+    st.markdown(f"### ✅ Predicted Class: **{class_label}**")
