@@ -1,43 +1,35 @@
 import streamlit as st
+from PIL import Image
 import numpy as np
 import tensorflow as tf
-from PIL import Image
-from gtts import gTTS
-import os
-import tempfile
 
-# Load the model
+# Load the trained model
 model = tf.keras.models.load_model("best_model.h5")
 
-# Load labels
-with open("labels.txt", "r") as f:
-    labels = f.read().splitlines()
+# Define class names (change this according to your training labels)
+class_names = ['Green', 'Red', 'Yellow']
 
-st.set_page_config(page_title="Traffic Sign Assistant", layout="centered")
-st.title("🚦 Traffic Sign Recognition & Voice Alert")
-st.write("Upload a traffic sign image to get a prediction and voice alert.")
+# Streamlit App
+st.title("🚦 Traffic Light Classifier")
+st.write("Upload an image of a traffic light to identify its color.")
 
-uploaded_file = st.file_uploader("📤 Upload Image", type=["jpg", "jpeg", "png"])
+# File uploader
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    image = Image.open(uploaded_file).convert("RGB")
+    # Display uploaded image
+    image = Image.open(uploaded_file)
     st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    # Preprocess
-    image = image.resize((64, 64))
-    img_array = np.array(image).astype('float32') / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
+    # Preprocessing: Resize, normalize, and expand dimensions
+    image = image.resize((128, 128))  # change if your model was trained on different size
+    image_array = np.array(image) / 255.0  # normalize
+    image_array = np.expand_dims(image_array, axis=0)  # shape: (1, 128, 128, 3)
 
     # Predict
-    prediction = model.predict(img_array)
-    class_id = np.argmax(prediction)
-    confidence = np.max(prediction)
-    label = labels[class_id]
+    prediction = model.predict(image_array)
+    predicted_class = class_names[np.argmax(prediction)]
 
-    st.success(f"🧠 Prediction: **{label}** with {confidence * 100:.2f}% confidence")
-
-    # Voice Alert
-    tts = gTTS(text=f"Attention. {label}", lang='en')
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-        tts.save(fp.name)
-        st.audio(fp.name, format="audio/mp3")
+    # Display result
+    st.success(f"**Predicted Class: {predicted_class}**")
+    st.write(f"Prediction Confidence: {np.max(prediction)*100:.2f}%")
