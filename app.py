@@ -4,6 +4,9 @@ import pandas as pd
 import tensorflow as tf
 from PIL import Image
 
+# ✅ MUST be the first Streamlit command
+st.set_page_config(page_title="Traffic Sign Classifier", layout="centered")
+
 # Function to load model
 @st.cache_resource
 def load_model():
@@ -31,7 +34,6 @@ model = load_model()
 class_names = load_class_names()
 
 # Streamlit UI
-st.set_page_config(page_title="Traffic Sign Classifier", layout="centered")
 st.title("🚦 Traffic Sign Classifier")
 st.markdown("Upload a traffic sign image and get its prediction.")
 
