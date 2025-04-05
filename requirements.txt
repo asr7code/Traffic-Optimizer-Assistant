@@ -1,5 +1,6 @@
 streamlit
 tensorflow
-Pillow
+keras
 numpy
-gTTS
+pandas
+scikit-learn
