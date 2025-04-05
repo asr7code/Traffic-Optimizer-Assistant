@@ -1,55 +1,52 @@
 import streamlit as st
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 from PIL import Image
 import cv2
-import os
 
-# Constants
-IMG_HEIGHT = 64
-IMG_WIDTH = 64
-
-# Load model
-@st.cache_resource
-def load_model():
-    return tf.keras.models.load_model("best_model.h5")
-
-model = load_model()
-
-# Load class names from signnames.csv
+# Load class names from labels.txt
 @st.cache_data
 def load_class_names():
-    df = pd.read_csv("signnames.csv")
-    return df
+    with open("labels.txt", "r") as file:
+        labels = [line.strip() for line in file.readlines()]
+    return labels
 
-sign_df = load_class_names()
+# Load the model
+@st.cache_resource
+def load_model():
+    model = tf.keras.models.load_model("best_model.h5")
+    return model
 
-st.set_page_config(page_title="GTSRB Traffic Sign Classifier")
-st.title("🚦 GTSRB Traffic Sign Classifier")
-st.write("Upload an image of a German traffic sign and the model will predict its class!")
+# Preprocess uploaded image
+def preprocess_image(image):
+    image = image.convert("RGB")
+    image = image.resize((30, 30))
+    image_np = np.array(image)
+    image_np = image_np / 255.0  # Normalize
+    image_np = np.expand_dims(image_np, axis=0)
+    return image_np
 
-uploaded_file = st.file_uploader("Choose a traffic sign image...", type=["jpg", "jpeg", "png"])
+# Main Streamlit App
+def main():
+    st.title("Traffic Sign Classifier 🚦")
+    st.write("Upload a traffic sign image and I'll tell you what it is!")
 
-if uploaded_file is not None:
-    # Display uploaded image
-    st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
 
-    # Preprocess the image
-    image = Image.open(uploaded_file).convert("RGB")
-    image = image.resize((IMG_WIDTH, IMG_HEIGHT))
-    img_array = np.array(image).astype("float32") / 255.0
-    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    # Predict
-    predictions = model.predict(img_array)
-    pred_class_id = np.argmax(predictions, axis=1)[0]
+        st.write("Classifying...")
+        processed_image = preprocess_image(image)
 
-    # Get the class name
-    class_name = sign_df.loc[sign_df['ClassId'] == pred_class_id, 'SignName'].values[0]
+        model = load_model()
+        predictions = model.predict(processed_image)
+        predicted_class = np.argmax(predictions)
+        class_names = load_class_names()
+        predicted_label = class_names[predicted_class]
 
-    st.success(f"🧠 Predicted: **{class_name}** (Class ID: {pred_class_id})")
+        st.success(f"Prediction: **{predicted_label}**")
 
-    # Optionally: Show prediction confidence
-    confidence = np.max(predictions) * 100
-    st.info(f"📊 Confidence: {confidence:.2f}%")
+if __name__ == "__main__":
+    main()
