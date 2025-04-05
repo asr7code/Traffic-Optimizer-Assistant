@@ -5,8 +5,4 @@ numpy
 Pillow
 gTTS
 playsound==1.2.2
-streamlit
-opencv-python
-Pillow
-numpy
 pyttsx3
