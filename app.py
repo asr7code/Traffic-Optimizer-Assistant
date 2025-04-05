@@ -20,14 +20,14 @@ def load_class_names():
     return dict(zip(df['ClassId'], df['SignName']))
 
 # Preprocess image for prediction
-def preprocess_image(image):
-    if image.mode != "RGB":
-        image = image.convert("RGB")
-    image = image.resize((64, 64))  # ✅ Resize to match model input shape
-    image = np.array(image)
-    image = image / 255.0  # ✅ Normalize pixel values
-    image = image[np.newaxis, ...]  # ✅ Add batch dimension: (1, 64, 64, 3)
-    return image
+def preprocess_image(uploaded_file):
+    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, 1)  # 1 for color
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Important
+    img = cv2.resize(img, (64, 64))
+    img = img / 255.0  # Normalize
+    img = np.expand_dims(img, axis=0)  # Add batch dimension
+    return img
 
 
 # Load model and class names
