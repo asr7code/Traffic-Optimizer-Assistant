@@ -17,11 +17,21 @@ label_binarizer = load_label_binarizer()
 class_names = label_binarizer.classes_
 
 # Preprocessing function
-def preprocess_image(image):
-    img = Image.open(image).convert("RGB")
-    img = img.resize((64, 64))  # Ensure same size as training
-    img_array = np.array(img).astype("float32") / 255.0  # Normalize
-    return np.expand_dims(img_array, axis=0)  # Add batch dimension
+import cv2
+import tempfile
+
+def preprocess_image(uploaded_file):
+    # Save uploaded file to temp file so OpenCV can read it
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp:
+        tmp.write(uploaded_file.read())
+        tmp_path = tmp.name
+
+    # Read using OpenCV to match Colab behavior
+    img = cv2.imread(tmp_path)  # BGR
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB
+    img = cv2.resize(img, (64, 64))
+    img = img.astype('float32') / 255.0
+    return np.expand_dims(img, axis=0)
 
 # Streamlit UI
 st.title("🚦 GTSRB Traffic Sign Classifier")
