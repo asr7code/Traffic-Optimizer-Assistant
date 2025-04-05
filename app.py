@@ -5,18 +5,19 @@ from tensorflow.keras.models import load_model
 import pickle
 from PIL import Image
 import cv2
+import tempfile
 
-# Must be the first Streamlit command
+# Set page config (must be first)
 st.set_page_config(page_title="GTSRB Traffic Sign Classifier", layout="centered")
 
-# Load the trained model (using caching for efficiency)
+# Load the trained model
 @st.cache_resource
 def load_cnn_model():
     return load_model("best_model.h5")
 
 model = load_cnn_model()
 
-# Load the label binarizer to retrieve the class names
+# Load the label binarizer to get class names
 @st.cache_resource
 def load_label_binarizer():
     with open("label_binarizer.pkl", "rb") as f:
@@ -25,25 +26,39 @@ def load_label_binarizer():
 label_binarizer = load_label_binarizer()
 class_names = label_binarizer.classes_
 
-def preprocess_image(image_data):
+def preprocess_pil(pil_img):
     """
-    Preprocesses the uploaded image:
-      - Opens the image using PIL and converts it to RGB.
-      - Converts the RGB image to BGR (mimicking cv2.imread() used during training).
-      - Resizes the image to 64x64.
-      - Normalizes pixel values (divides by 255.0).
-      - Adds a batch dimension.
+    Preprocess a PIL image:
+      - Resize to (64, 64)
+      - Convert to a NumPy array and normalize pixel values
+      - Add a batch dimension
     """
-    image = Image.open(image_data).convert("RGB")
-    image_np = np.array(image)
-    # Convert RGB to BGR by reversing the last channel
-    image_bgr = image_np[..., ::-1]
-    # Resize to 64x64 (the training input size)
-    image_bgr = cv2.resize(image_bgr, (64, 64))
-    image_bgr = image_bgr.astype("float32") / 255.0  # Normalize
-    return np.expand_dims(image_bgr, axis=0)
+    pil_img = pil_img.resize((64, 64))
+    img_array = np.array(pil_img).astype("float32") / 255.0
+    return np.expand_dims(img_array, axis=0)
 
-# Streamlit UI
+def tta_predict(uploaded_file):
+    """
+    Applies Test-Time Augmentation (TTA) by rotating the image by several angles,
+    predicting each variation, and averaging the predictions.
+    """
+    # Open the uploaded file as a PIL image
+    pil_img = Image.open(uploaded_file).convert("RGB")
+    
+    # Define a few rotation angles (in degrees)
+    angles = [-10, 0, 10]
+    preds = []
+    
+    # Loop over each angle, rotate and predict
+    for angle in angles:
+        rotated = pil_img.rotate(angle)
+        processed = preprocess_pil(rotated)
+        preds.append(model.predict(processed))
+    
+    # Average predictions over all augmented versions
+    avg_pred = np.mean(preds, axis=0)
+    return avg_pred
+
 st.title("🚦 German Traffic Sign Classifier")
 st.write("Upload an image of a German traffic sign to classify it:")
 
@@ -52,16 +67,10 @@ uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png
 if uploaded_file is not None:
     st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
     
-    processed_image = preprocess_image(uploaded_file)
-    prediction = model.predict(processed_image)
+    # Use Test-Time Augmentation for a more robust prediction
+    prediction = tta_predict(uploaded_file)
     predicted_class = np.argmax(prediction)
     confidence = prediction[0][predicted_class] * 100
-
+    
     st.markdown(f"### 🧠 Predicted Class: **{class_names[predicted_class]}**")
     st.markdown(f"#### 🔍 Confidence: **{confidence:.2f}%**")
-    
-    # Display the top-3 predictions for additional insight
-    top3_indices = np.argsort(prediction[0])[-3:][::-1]
-    st.markdown("#### Top 3 Predictions:")
-    for idx in top3_indices:
-        st.write(f"**{class_names[idx]}**: {prediction[0][idx]*100:.2f}%")
