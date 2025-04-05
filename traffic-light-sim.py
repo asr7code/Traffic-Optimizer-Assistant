@@ -1,24 +1,30 @@
 import streamlit as st
+
+# Must be the very first Streamlit command
+st.set_page_config(page_title="Traffic Light Simulator & Speed Advisor", layout="centered")
+
 import time
 from streamlit_autorefresh import st_autorefresh
 import folium
 from streamlit_folium import st_folium
 
-# ---------------- Configuration -----------------
-# Traffic light simulation durations (in seconds)
-RED_DURATION = 30
-YELLOW_DURATION = 5
-GREEN_DURATION = 25
+# ----- Configuration for Simulation -----
+# Define durations (in seconds) for each traffic light phase:
+RED_DURATION = 30      # Red light lasts 30 seconds
+YELLOW_DURATION = 5    # Yellow light lasts 5 seconds
+GREEN_DURATION = 25    # Green light lasts 25 seconds
 CYCLE_DURATION = RED_DURATION + YELLOW_DURATION + GREEN_DURATION
 
-# Dummy geographic data for Chandigarh city
-# (These coordinates can be replaced with real intersection coordinates)
+# Dummy geographic data for Chandigarh city (adjust as needed)
 CHD_LAT = 30.7333  
 CHD_LON = 76.7794  
 
-# ---------------- Helper Functions -----------------
+# ----- Helper Functions -----
 def get_traffic_light_phase(current_time):
-    """Determine the current phase and the remaining time for that phase."""
+    """
+    Given the current time (in seconds modulo the cycle duration),
+    determine the current phase (Red, Yellow, Green) and time remaining in that phase.
+    """
     if current_time < RED_DURATION:
         phase = "Red"
         remaining = RED_DURATION - current_time
@@ -33,51 +39,50 @@ def get_traffic_light_phase(current_time):
 def suggest_speed(phase, remaining_time, distance):
     """
     Suggest a speed (in km/h) based on:
-      - Current phase,
-      - Remaining time in the current phase,
-      - Simulated distance to the intersection (in meters).
+      - the current traffic light phase,
+      - remaining time in the current phase,
+      - and the distance to the intersection (in meters).
+    
+    This is a very simple heuristic:
+    - For green, a default safe speed is used.
+    - For red or yellow, we compute the speed needed to cover the distance in the remaining time.
+    Note: 1 m/s = 3.6 km/h.
     """
     if distance <= 0 or remaining_time <= 0:
         return 0
-    # For green light, use a default cruising speed.
     if phase == "Green":
-        return 50
+        return 50  # e.g., 50 km/h default cruising speed for green
     else:
-        # Calculate required speed (m/s) to cover the distance in the remaining time
-        speed_mps = distance / remaining_time  
-        # Convert m/s to km/h (1 m/s = 3.6 km/h)
+        speed_mps = distance / remaining_time
         speed_kmh = speed_mps * 3.6
-        return min(speed_kmh, 80)  # Cap at 80 km/h for safety
+        return min(speed_kmh, 80)  # Cap speed at 80 km/h
 
-# ---------------- Auto-Refresh -----------------
-# Refresh the app every second (1000 ms)
+# ----- Auto-Refresh Setup -----
+# Refresh the app every 1 second (1000 ms)
 st_autorefresh(interval=1000, limit=None, key="auto-refresh")
 
-# ---------------- Simulation Logic -----------------
-# Compute current cycle time (in seconds) using system time modulo cycle duration
+# ----- Simulation Logic -----
+# Compute current cycle time (in seconds) using system time modulo the cycle duration
 current_cycle_time = time.time() % CYCLE_DURATION
 phase, time_remaining = get_traffic_light_phase(current_cycle_time)
 
-# ----------------- UI -----------------
-st.set_page_config(page_title="Traffic Light Simulator & Speed Advisor", layout="centered")
-st.title("🚦 Traffic Light Simulation & Speed Suggestion")
+# ----- Streamlit UI -----
+st.title("🚦 Traffic Light Simulation & Speed Advisor")
+st.write("This simulation displays the current traffic light phase, a countdown timer, and suggests a driving speed based on your distance to the light.")
 
-# Display current traffic light phase and remaining time
+# Display current phase and remaining time
 st.markdown(f"### Current Traffic Light Phase: **{phase}**")
 st.markdown(f"#### Time Remaining in Phase: **{int(time_remaining)} seconds**")
 
-# Dummy distance input for Chandigarh (in meters)
+# Input for distance to the traffic light (in meters)
 distance = st.number_input("Enter distance to the traffic light (in meters):", min_value=0.0, value=100.0)
 
-# Calculate recommended speed based on current phase, remaining time, and distance
+# Calculate recommended speed
 recommended_speed = suggest_speed(phase, time_remaining, distance)
 st.markdown(f"### Recommended Speed: **{recommended_speed:.2f} km/h**")
 
-# ---------------- Map Integration -----------------
+# ----- Map Integration with Folium -----
 st.markdown("### Intersection Location in Chandigarh")
-# Create a folium map centered at the dummy intersection in Chandigarh
 m = folium.Map(location=[CHD_LAT, CHD_LON], zoom_start=15)
 folium.Marker([CHD_LAT, CHD_LON], popup="Intersection").add_to(m)
-
-# Display the map in the app
 st_folium(m, width=700, height=500)
