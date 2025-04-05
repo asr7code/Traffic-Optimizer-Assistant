@@ -21,13 +21,14 @@ def load_class_names():
 
 # Preprocess image for prediction
 def preprocess_image(image):
-    image = image.resize((30, 30))  # Resize to 30x30
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    image = image.resize((64, 64))  # ✅ Resize to match model input shape
     image = np.array(image)
-    if image.shape[-1] == 4:  # Remove alpha channel if present
-        image = image[:, :, :3]
-    image = image / 255.0  # Normalize
-    image = image[np.newaxis, ...]  # Add batch dimension
+    image = image / 255.0  # ✅ Normalize pixel values
+    image = image[np.newaxis, ...]  # ✅ Add batch dimension: (1, 64, 64, 3)
     return image
+
 
 # Load model and class names
 model = load_model()
