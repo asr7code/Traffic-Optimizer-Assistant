@@ -8,3 +8,5 @@ folium
 streamlit-folium
 opencv-python
 pyttsx3
+pillow
+scikit-learn
