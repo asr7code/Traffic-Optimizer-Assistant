@@ -6,3 +6,5 @@ Pillow
 streamlit-autorefresh
 folium
 streamlit-folium
+opencv-python
+pyttsx3
