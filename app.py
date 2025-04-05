@@ -9,14 +9,14 @@ import cv2
 # Must be the first Streamlit command
 st.set_page_config(page_title="GTSRB Traffic Sign Classifier", layout="centered")
 
-# Load model (with Streamlit caching)
+# Load the trained model (using caching to speed up subsequent runs)
 @st.cache_resource
 def load_cnn_model():
     return load_model("best_model.h5")
 
 model = load_cnn_model()
 
-# Load label binarizer (for class names)
+# Load the label binarizer to get class names (using caching)
 @st.cache_resource
 def load_label_binarizer():
     with open("label_binarizer.pkl", "rb") as f:
@@ -27,45 +27,50 @@ class_names = label_binarizer.classes_
 
 def preprocess_image(image_data):
     """
-    Preprocess uploaded image:
-    - Converts to RGB
-    - Resizes to (64, 64)
-    - Normalizes pixel values to [0, 1]
-    - Adds batch dimension
+    Preprocesses the uploaded image to match the training conditions:
+    - Reads image using PIL and converts it to RGB.
+    - Converts RGB image to BGR (mimicking cv2.imread() used during training).
+    - Resizes the image to 64x64.
+    - Normalizes pixel values (divides by 255.0).
+    - Adds a batch dimension.
     """
+    # Open the uploaded image
     image = Image.open(image_data).convert("RGB")
+    
+    # Convert to numpy array (in RGB)
     image_np = np.array(image)
-
-    # Resize using OpenCV to (64, 64) for consistency with training
-    image_resized = cv2.resize(image_np, (64, 64))
-
-    # Normalize and expand dims
-    image_normalized = image_resized.astype("float32") / 255.0
-    return np.expand_dims(image_normalized, axis=0)
+    
+    # Convert RGB to BGR by reversing the last channel
+    image_bgr = image_np[..., ::-1]
+    
+    # Resize image to (64, 64) using OpenCV for consistency with training
+    image_bgr = cv2.resize(image_bgr, (64, 64))
+    
+    # Normalize pixel values to [0, 1]
+    image_bgr = image_bgr.astype("float32") / 255.0
+    
+    # Add batch dimension so that shape becomes (1, 64, 64, 3)
+    return np.expand_dims(image_bgr, axis=0)
 
 # Streamlit UI
 st.title("🚦 German Traffic Sign Classifier")
 st.write("Upload an image of a German traffic sign to classify it:")
 
+# File uploader for image input
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Display uploaded image
+    # Display the uploaded image
     st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
-
-    # Preprocess and predict
-    processed_image = preprocess_image(uploaded_file)
-    prediction = model.predict(processed_image)
     
-    predicted_class_idx = np.argmax(prediction)
-    predicted_class_name = class_names[predicted_class_idx]
-    confidence = prediction[0][predicted_class_idx] * 100
-
-    # Debug: Show prediction confidence for all classes (optional)
-    with st.expander("🔬 Prediction Confidence for All Classes"):
-        for i, prob in enumerate(prediction[0]):
-            st.write(f"{class_names[i]}: {prob * 100:.2f}%")
-
-    # Output prediction
-    st.markdown(f"### 🧠 Predicted Class: **{predicted_class_name}**")
+    # Preprocess the image using the function defined above
+    processed_image = preprocess_image(uploaded_file)
+    
+    # Run the model prediction
+    prediction = model.predict(processed_image)
+    predicted_class = np.argmax(prediction)
+    confidence = prediction[0][predicted_class] * 100
+    
+    # Display prediction result and confidence
+    st.markdown(f"### 🧠 Predicted Class: **{class_names[predicted_class]}**")
     st.markdown(f"#### 🔍 Confidence: **{confidence:.2f}%**")
