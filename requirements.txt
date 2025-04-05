@@ -1,8 +1,5 @@
 streamlit
 tensorflow
-opencv-python
-numpy
 Pillow
+numpy
 gTTS
-playsound==1.2.2
-pyttsx3
